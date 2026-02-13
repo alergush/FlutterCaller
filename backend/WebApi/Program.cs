@@ -32,9 +32,12 @@ using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read))
     credential = GoogleCredential.FromServiceAccountCredential(serviceAccount);
 }
 
-FirebaseApp.Create(new AppOptions() { Credential = credential });
+if (FirebaseApp.DefaultInstance == null)
+{
+    FirebaseApp.Create(new AppOptions() { Credential = credential });
+}
 
-builder.Services.AddSingleton(sp =>
+builder.Services.AddSingleton(_ =>
 {
     var clientBuilder = new FirestoreClientBuilder { Credential = credential };
     var client = clientBuilder.Build();
