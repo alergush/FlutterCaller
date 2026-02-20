@@ -25,7 +25,8 @@ android {
         applicationId = "com.alergush.flutter_caller"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+//        minSdk = flutter.minSdkVersion
+        minSdk = 30
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -36,6 +37,7 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
@@ -45,8 +47,9 @@ flutter {
 }
 
 dependencies {
-    implementation("com.twilio:voice-android:6.10.0")
+    implementation("com.twilio:voice-android:6.10.1")
     implementation("com.google.firebase:firebase-messaging:25.0.1")
-//     implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
-    // implementation("androidx.lifecycle:lifecycle-process:2.10.0")
+//    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
+    implementation("com.twilio:audioswitch:1.2.5")
+    implementation("androidx.lifecycle:lifecycle-process:2.10.0")
 }
