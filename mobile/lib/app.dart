@@ -3,10 +3,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_caller/models/call_status.dart';
-import 'package:flutter_caller/screens/call_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_caller/models/call_status.dart';
+import 'package:flutter_caller/screens/call_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -122,34 +122,52 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   void _onEventReceived(dynamic event) {
     final data = event as Map<dynamic, dynamic>;
 
-    debugPrint("FLUTTER: Received Event from Java: $data");
+    debugPrint("${DateTime.now()} FLUTTER: Received Event from Java: $data");
+
+    final providerState = ref.read(callStateProvider);
+    final wasMinimized = providerState.callScreenState.isMinimized;
+    final isFirstConnection = providerState.isFirstConnection;
 
     final stateChanged = ref.read(callStateProvider.notifier).syncWithMap(data);
 
     if (stateChanged) {
-      final statusStr = data['callStatus'] ?? "idle";
+      final statusStr = data['callStatus'] ?? CallStatus.idle.name;
 
-      final isIdle =
-          statusStr.toLowerCase() == CallStatus.idle.name ||
-          statusStr.toLowerCase() == CallStatus.disconnected.name;
+      final status = CallStatus.values.firstWhere(
+        (e) => e.name == statusStr.toLowerCase(),
+        orElse: () => CallStatus.idle,
+      );
+
+      final isIdle = status == CallStatus.idle;
+
+      if (status == CallStatus.connected && isFirstConnection) {
+        HapticFeedback.mediumImpact();
+      }
 
       if (!isIdle) {
-        bool isCallScreenOpen = false;
+        if (!wasMinimized) {
+          bool isCallScreenOpen = false;
+          navigatorKey.currentState?.popUntil((route) {
+            if (route.settings.name == 'call_screen') {
+              isCallScreenOpen = true;
+            }
+            return true;
+          });
+
+          if (!isCallScreenOpen) {
+            navigatorKey.currentState?.pushNamedAndRemoveUntil(
+              'call_screen',
+              (route) => route.settings.name != 'call_screen',
+            );
+          }
+        }
+      } else {
         navigatorKey.currentState?.popUntil((route) {
           if (route.settings.name == 'call_screen') {
-            isCallScreenOpen = true;
+            return false;
           }
           return true;
         });
-
-        if (!isCallScreenOpen) {
-          navigatorKey.currentState?.pushNamedAndRemoveUntil(
-            'call_screen',
-            (route) => route.settings.name != 'call_screen',
-          );
-        }
-      } else {
-        navigatorKey.currentState?.popUntil((route) => route.isFirst);
       }
     }
   }

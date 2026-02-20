@@ -6,8 +6,6 @@ import 'package:flutter_caller/screens/call_screen.dart';
 import 'package:flutter_caller/providers/call_state_provider.dart';
 import 'package:flutter_caller/widgets/call_screen/call_timer_widget.dart';
 
-// import 'package:flutter/scheduler.dart' show timeDilation;
-
 class CallBannerWidget extends ConsumerWidget {
   const CallBannerWidget({
     super.key,
@@ -102,8 +100,6 @@ class CallBannerWidget extends ConsumerWidget {
       onPressed: () async {
         HapticFeedback.lightImpact();
 
-        // timeDilation = 10;
-
         if (callState.callStatus != CallStatus.idle &&
             callState.callStatus != CallStatus.disconnected) {
           await notifier.hangup();
@@ -165,8 +161,7 @@ class CallBannerWidget extends ConsumerWidget {
                         padding: const EdgeInsets.only(right: 8),
                         child: acceptMicroButtonWidget,
                       ),
-                    ] else if (callState.callStatus != CallStatus.idle &&
-                        callState.callStatus != CallStatus.disconnected) ...[
+                    ] else if (callState.callStatus != CallStatus.idle) ...[
                       Padding(
                         padding: const EdgeInsets.only(left: 8),
                         child: acceptMicroButtonWidget,

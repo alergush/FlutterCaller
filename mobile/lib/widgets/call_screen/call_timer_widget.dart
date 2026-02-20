@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_caller/models/call_status.dart';
 import 'package:flutter_caller/utils/format_duration.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_caller/providers/call_state_provider.dart';
 
 class CallTimerWidget extends ConsumerStatefulWidget {
@@ -39,23 +39,25 @@ class _CallTimerState extends ConsumerState<CallTimerWidget> {
   void _updateTime() {
     final callState = ref.read(callStateProvider);
 
-    if (callState.callStatus != CallStatus.connected ||
-        callState.connectedAt == null) {
-      if (_formattedTime != "00:00") {
-        setState(() {
-          _formattedTime = "00:00";
-        });
-      }
+    if (callState.callStatus == CallStatus.disconnected) {
       return;
     }
 
-    final duration = DateTime.now().difference(callState.connectedAt!);
-    final newTime = formatDuration(duration);
+    if ((callState.callStatus == CallStatus.connected ||
+            callState.callStatus == CallStatus.reconnecting) &&
+        callState.connectedAt != null) {
+      final duration = DateTime.now().difference(callState.connectedAt!);
+      final newTime = formatDuration(duration);
 
-    if (_formattedTime != newTime) {
-      if (mounted) {
+      if (_formattedTime != newTime && mounted) {
         setState(() {
           _formattedTime = newTime;
+        });
+      }
+    } else {
+      if (_formattedTime != "00:00" && mounted) {
+        setState(() {
+          _formattedTime = "00:00";
         });
       }
     }

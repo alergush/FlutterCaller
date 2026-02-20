@@ -22,6 +22,8 @@ public class CallStateManager {
 
     private volatile boolean isRegistered = false;
     private volatile String registrationError = null;
+    private volatile boolean isFirstConnection = false;
+    private boolean isLocallyDisconnected = false;
 
     private CallStateManager() {
     }
@@ -34,17 +36,23 @@ public class CallStateManager {
         return instance;
     }
 
-//    public synchronized void updateCallState(CallStatus status, String callError, String name, String phone) {
-//        this.callStatus = status;
-//        this.callError = callError;
-//        this.callerName = name;
-//        this.callerPhone = phone;
-//        checkAndSetTimer(status);
-//    }
-
     public synchronized void setCallStatus(CallStatus callStatus, String callError) {
         this.callStatus = callStatus;
         this.callError = callError;
+
+        if (callStatus == CallStatus.IDLE || callStatus == CallStatus.DISCONNECTED) {
+            this.isMuted = false;
+            this.isSpeakerOn = false;
+        }
+    }
+
+
+    public void setLocallyDisconnected(boolean locallyDisconnected) {
+        this.isLocallyDisconnected = locallyDisconnected;
+    }
+
+    public synchronized boolean isLocallyDisconnected() {
+        return isLocallyDisconnected;
     }
 
     public synchronized void setCallerName(String callerName) {
@@ -67,15 +75,6 @@ public class CallStateManager {
         return callError;
     }
 
-    private synchronized void checkAndSetTimer(CallStatus status) {
-        if (status == CallStatus.CONNECTED && callStartTime == 0) {
-            this.callStartTime = System.currentTimeMillis();
-        }
-        else if (status == CallStatus.IDLE || status == CallStatus.DISCONNECTED) {
-            this.callStartTime = 0;
-        }
-    }
-
     public synchronized void setMute(boolean muted) {
         this.isMuted = muted;
     }
@@ -96,6 +95,7 @@ public class CallStateManager {
         map.put("isMuted", isMuted);
         map.put("isSpeakerOn", isSpeakerOn);
         map.put("callStartTime", callStartTime);
+        map.put("isFirstConnection", isFirstConnection);
 
         return map;
     }
@@ -106,32 +106,10 @@ public class CallStateManager {
 
     public synchronized void setActiveCall(Call call) {
         this.activeCall = call;
-
-//        if (call != null) {
-//            try {
-//                this.callStatus = CallStatus.valueOf(call.getState().name());
-//                this.callerPhone = call.getFrom();
-//                checkAndSetTimer(this.callStatus);
-//            }
-//            catch (IllegalArgumentException ex) {
-//                this.callStatus = CallStatus.CONNECTING;
-//            }
-//        }
-//        else {
-//            reset();
-//        }
     }
 
     public synchronized void setActiveCallInvite(CallInvite invite) {
         this.activeCallInvite = invite;
-
-//        if (invite != null) {
-//            this.callStatus = CallStatus.RINGING;
-//            this.callerPhone = invite.getFrom();
-//        }
-//        else {
-//            reset();
-//        }
     }
 
     public synchronized void setRegistrationStatus(boolean success, String error) {
@@ -155,6 +133,14 @@ public class CallStateManager {
         return callerPhone;
     }
 
+    public synchronized void setIsFirstConnection(boolean isFirstConnection) {
+        this.isFirstConnection = isFirstConnection;
+    }
+
+    public boolean getIsFirstConnection() {
+        return isFirstConnection;
+    }
+
     public synchronized void reset() {
         this.activeCall = null;
         this.activeCallInvite = null;
@@ -165,5 +151,7 @@ public class CallStateManager {
         this.isMuted = false;
         this.isSpeakerOn = false;
         this.callStartTime = 0;
+        this.isFirstConnection = false;
+        this.isLocallyDisconnected = false;
     }
 }

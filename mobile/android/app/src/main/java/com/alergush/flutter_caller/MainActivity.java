@@ -19,13 +19,9 @@ import com.alergush.flutter_caller.utils.CallEvents;
 import com.alergush.flutter_caller.utils.CallMethods;
 import com.alergush.flutter_caller.utils.CallServiceListener;
 import com.alergush.flutter_caller.utils.CallStateManager;
-import com.alergush.flutter_caller.utils.CallStatus;
 import com.twilio.voice.RegistrationException;
 import com.twilio.voice.RegistrationListener;
 import com.twilio.voice.Voice;
-
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import io.flutter.embedding.android.FlutterActivity;
 import io.flutter.embedding.engine.FlutterEngine;
@@ -42,7 +38,6 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
     private CallService callService;
     private boolean isBound = false;
     private boolean shouldAnswerOnBind = false;
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     private final ServiceConnection callServiceConnection = new ServiceConnection() {
         @Override
@@ -77,7 +72,6 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
 
     @Override
     protected void onDestroy() {
-        executor.shutdown();
         super.onDestroy();
     }
 
@@ -142,24 +136,22 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
                 case answer -> {
                     if (isServiceReady()) {
                         callService.answerCall();
-                        result.success(null);
                     }
                     else {
                         shouldAnswerOnBind = true;
-                        result.success(null);
                     }
+
+                    result.success(null);
                 }
 
                 case hangup -> {
                     if (isServiceReady()) {
-//                        callService.hangupCall();
-                        executor.execute(() -> callService.hangupCall());
-                        CallStateManager.getInstance().setCallStatus(CallStatus.IDLE, null);
+                        callService.hangupCall();
                     }
-                    else
+                    else {
                         CallStateManager.getInstance().reset();
-
-                    syncStateWithFlutter();
+                        syncStateWithFlutter();
+                    }
 
                     result.success(null);
                 }
@@ -169,7 +161,8 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
                         callService.setMute(Boolean.TRUE.equals(call.argument("isMuted")));
                         result.success(null);
                     }
-                    else result.error("SERVICE_OFFLINE", null, null);
+                    else
+                        result.error("SERVICE_OFFLINE", null, null);
                 }
 
                 case toggleSpeaker -> {

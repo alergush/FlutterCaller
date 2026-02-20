@@ -11,10 +11,13 @@ import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.RingtoneManager;
+import android.media.ToneGenerator;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Log;
@@ -36,15 +39,22 @@ import com.twilio.voice.Call;
 import com.twilio.voice.CallException;
 import com.twilio.voice.CallInvite;
 
+import java.time.LocalDate;
+
 public class CallService extends Service {
     private static final String TAG = "CallService";
 
     private AudioSwitch audioSwitch;
     private MediaPlayer ringtonePlayer;
     private Vibrator vibrator;
+    private ToneGenerator toneGenerator;
+    private Runnable soundRunnable;
+    private final Handler soundHandler = new Handler(Looper.getMainLooper());
     private CallServiceListener listener;
 
     private boolean isRinging = false;
+
+    private static final int reconnectingToneGeneratorVolume = 60;
 
     private final IBinder binder = new LocalBinder();
 
@@ -85,6 +95,8 @@ public class CallService extends Service {
         }
 
         stopRinging();
+        stopSound();
+
         super.onDestroy();
     }
 
@@ -125,7 +137,7 @@ public class CallService extends Service {
         return START_NOT_STICKY;
     }
 
-    public void processIncomingCall() {
+    private void processIncomingCall() {
         CallStateManager callStateManager = CallStateManager.getInstance();
         CallInvite activeCallInvite = callStateManager.getActiveCallInvite();
 
@@ -178,8 +190,11 @@ public class CallService extends Service {
 
         stopRinging();
 
-        CallStateManager.getInstance().setActiveCallInvite(null);
-        CallStateManager.getInstance().setCallStatus(CallStatus.CONNECTING, null);
+        CallStateManager callStateManager = CallStateManager.getInstance();
+
+        callStateManager.setActiveCallInvite(null);
+        callStateManager.setCallStatus(CallStatus.CONNECTING, null);
+        callStateManager.setIsFirstConnection(true);
 
         if (listener != null) {
             listener.onCallStateUpdated();
@@ -208,6 +223,8 @@ public class CallService extends Service {
     public void hangupCall() {
         CallInvite activeCallInvite = CallStateManager.getInstance().getActiveCallInvite();
         Call activeCall = CallStateManager.getInstance().getActiveCall();
+
+        CallStateManager.getInstance().setLocallyDisconnected(true);
 
         stopRinging();
 
@@ -257,68 +274,6 @@ public class CallService extends Service {
 
     private final Call.Listener callListener = new Call.Listener() {
         @Override
-        public void onConnected(@NonNull Call call) {
-            CallStateManager callStateManager = CallStateManager.getInstance();
-
-            callStateManager.setCallStatus(CallStatus.CONNECTED, null);
-            callStateManager.setCallStartTime(System.currentTimeMillis());
-
-            if (listener != null) {
-                listener.onCallStateUpdated();
-            }
-
-            audioSwitch.activate();
-        }
-
-        @Override
-        public void onDisconnected(@NonNull Call call, @Nullable CallException e) {
-            CallStateManager callStateManager = CallStateManager.getInstance();
-
-            callStateManager.setActiveCall(null);
-
-            if (e == null) {
-                callStateManager.setCallStatus(CallStatus.IDLE, null);
-            }
-            else {
-                callStateManager.setCallStatus(CallStatus.DISCONNECTED, e.getMessage());
-
-                if (listener != null) {
-                    listener.onCallStateUpdated();
-                }
-            }
-
-            stopForegroundService();
-        }
-
-        @Override
-        public void onConnectFailure(@NonNull Call call, @NonNull CallException e) {
-            CallStateManager callStateManager = CallStateManager.getInstance();
-
-            callStateManager.setCallStatus(CallStatus.DISCONNECTED, e.getMessage());
-            callStateManager.setActiveCall(null);
-
-            if (listener != null) {
-                listener.onCallStateUpdated();
-            }
-
-            stopForegroundService();
-
-            // new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-//                CallStateManager callState = CallStateManager.getInstance();
-//
-//                if (callState.getCallStatus() == CallStatus.DISCONNECTED) {
-//                    CallStateManager.getInstance().reset();
-//                }
-//
-//                if (listener != null) {
-//                    listener.onCallStateUpdated();
-//                }
-//
-//                stopForegroundService();
-//            }, 3000);
-        }
-
-        @Override
         public void onRinging(@NonNull Call call) {
             CallStateManager callStateManager = CallStateManager.getInstance();
 
@@ -330,6 +285,85 @@ public class CallService extends Service {
         }
 
         @Override
+        public void onConnected(@NonNull Call call) {
+            CallStateManager callStateManager = CallStateManager.getInstance();
+
+            callStateManager.setCallStatus(CallStatus.CONNECTED, null);
+            callStateManager.setCallStartTime(System.currentTimeMillis());
+
+            if (listener != null) {
+                listener.onCallStateUpdated();
+            }
+
+            callStateManager.setIsFirstConnection(false);
+
+            audioSwitch.activate();
+        }
+
+        @Override
+        public void onConnectFailure(@NonNull Call call, @NonNull CallException e) {
+            stopSound();
+
+            CallStateManager callStateManager = CallStateManager.getInstance();
+
+            callStateManager.setCallStatus(CallStatus.DISCONNECTED, e.getMessage());
+            callStateManager.setActiveCall(null);
+            callStateManager.setIsFirstConnection(false);
+
+            if (listener != null) {
+                listener.onCallStateUpdated();
+            }
+
+            startSound(ToneGenerator.TONE_PROP_PROMPT, 250, 500, 2);
+            vibrate(new long[]{ 0, 250, 200, 250 }, false);
+
+            stopForeground(STOP_FOREGROUND_REMOVE);
+
+            delayedReset();
+        }
+
+        @Override
+        public void onDisconnected(@NonNull Call call, @Nullable CallException e) {
+            stopSound();
+
+            Log.e(TAG, LocalDate.now() + " onDisconnected()");
+
+            CallStateManager callStateManager = CallStateManager.getInstance();
+
+            callStateManager.setActiveCall(null);
+
+            boolean localHangup = callStateManager.isLocallyDisconnected();
+
+            if (e != null) {
+                callStateManager.setCallStatus(CallStatus.DISCONNECTED, e.getMessage());
+
+                startSound(ToneGenerator.TONE_PROP_PROMPT, 250, 500, 2);
+                vibrate(new long[]{ 0, 250, 200, 250 }, false);
+
+                delayedReset();
+            }
+            else if (localHangup) {
+                callStateManager.reset();
+                manualReset();
+                return;
+            }
+            else {
+                callStateManager.setCallStatus(CallStatus.DISCONNECTED, null);
+
+                startSound(ToneGenerator.TONE_PROP_PROMPT, 250, 500, 2);
+                vibrate(new long[]{ 0, 250, 200, 250 }, false);
+
+                delayedReset();
+            }
+
+            if (listener != null) {
+                listener.onCallStateUpdated();
+            }
+
+            stopForeground(STOP_FOREGROUND_REMOVE);
+        }
+
+        @Override
         public void onReconnecting(@NonNull Call call, @NonNull CallException e) {
             CallStateManager callStateManager = CallStateManager.getInstance();
 
@@ -338,6 +372,8 @@ public class CallService extends Service {
             if (listener != null) {
                 listener.onCallStateUpdated();
             }
+
+            startSound(ToneGenerator.TONE_PROP_BEEP, 200, 1500, Integer.MAX_VALUE);
         }
 
         @Override
@@ -349,6 +385,8 @@ public class CallService extends Service {
             if (listener != null) {
                 listener.onCallStateUpdated();
             }
+
+            stopSound();
         }
     };
 
@@ -407,6 +445,7 @@ public class CallService extends Service {
 
     private void startRinging() {
         AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
         if (audioManager == null) return;
 
         int ringerMode = audioManager.getRingerMode();
@@ -431,15 +470,7 @@ public class CallService extends Service {
             }
         }
 
-        if (ringerMode == AudioManager.RINGER_MODE_NORMAL ||
-                ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
-            vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-
-            if (vibrator != null) {
-                long[] pattern = { 0, 1000, 1000 };
-                vibrator.vibrate(VibrationEffect.createWaveform(pattern, 1));
-            }
-        }
+        vibrate(new long[]{ 0, 1000, 1000 }, true);
 
         isRinging = true;
 
@@ -465,5 +496,78 @@ public class CallService extends Service {
             unregisterReceiver(volumeReceiver);
         }
         catch (Exception ignored) { }
+    }
+
+    private void startSound(int toneType, int durationMs, int delayMs, int repeat) {
+        stopSound();
+
+        try {
+            toneGenerator = new ToneGenerator(
+                    AudioManager.STREAM_VOICE_CALL,
+                    reconnectingToneGeneratorVolume);
+
+            soundRunnable = new Runnable() {
+                int currentCount = 0;
+
+                @Override
+                public void run() {
+                    if (toneGenerator != null) {
+                        toneGenerator.startTone(toneType, durationMs);
+
+                        currentCount++;
+
+                        if (repeat == Integer.MAX_VALUE || currentCount < repeat) {
+                            soundHandler.postDelayed(this, delayMs);
+                        }
+                    }
+                }
+            };
+
+            soundHandler.post(soundRunnable);
+        }
+        catch (Exception e) {
+            Log.e(TAG, "Play Reconnecting Sound Error: " + e.getMessage());
+        }
+    }
+
+    private void stopSound() {
+        if (soundRunnable != null) {
+            soundHandler.removeCallbacks(soundRunnable);
+            soundRunnable = null;
+        }
+
+        if (toneGenerator != null) {
+            toneGenerator.release();
+            toneGenerator = null;
+        }
+    }
+
+    private void vibrate(long[] pattern, boolean repeat) {
+        AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
+        if (audioManager == null) return;
+
+        int ringerMode = audioManager.getRingerMode();
+
+        if (ringerMode == AudioManager.RINGER_MODE_NORMAL ||
+                ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
+            vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+
+            if (vibrator != null) {
+                vibrator.vibrate(VibrationEffect.createWaveform(pattern, repeat ? 1 : -1));
+            }
+        }
+    }
+
+    private void delayedReset() {
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            CallStateManager.getInstance().reset();
+
+            if (listener != null) {
+                listener.onCallStateUpdated();
+            }
+
+            stopForegroundService();
+        }, 2000);
     }
 }

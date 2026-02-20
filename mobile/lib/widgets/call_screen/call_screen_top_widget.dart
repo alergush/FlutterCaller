@@ -74,7 +74,10 @@ class CallScreenTopWidget extends ConsumerWidget {
       );
     } else if (callState.callStatus == CallStatus.disconnected) {
       centerContent = Text(
-        "Disconnected",
+        callState.callStatus == CallStatus.disconnected &&
+                callState.callError != null
+            ? "Disconnected"
+            : "Call Ended",
         style: Theme.of(context).textTheme.bodyLarge!.copyWith(
           color: Colors.white,
         ),
@@ -88,19 +91,20 @@ class CallScreenTopWidget extends ConsumerWidget {
         child: Stack(
           children: [
             // Minimize Button
-            Align(
-              alignment: .centerLeft,
-              child: Padding(
-                padding: EdgeInsets.only(left: 12),
-                child: IconButton(
-                  onPressed: onPressed,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down,
-                    color: Colors.white,
+            if (callState.callStatus != CallStatus.disconnected)
+              Align(
+                alignment: .centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(left: 12),
+                  child: IconButton(
+                    onPressed: onPressed,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
-            ),
             // Text
             Align(
               alignment: .center,

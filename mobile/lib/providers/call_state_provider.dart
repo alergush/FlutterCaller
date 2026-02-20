@@ -7,6 +7,7 @@ import 'package:flutter_caller/models/call_state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_caller/models/call_status.dart';
 import 'package:flutter_caller/models/call_methods.dart';
+import 'package:flutter_caller/models/call_screen_state.dart';
 
 final _methodChannel = MethodChannel(
   'com.alergush.flutter_caller/call_methods',
@@ -21,12 +22,16 @@ class CallNotifier extends Notifier<CallState> {
   }
 
   bool syncWithMap(Map<dynamic, dynamic> data) {
-    final String statusStr = data['callStatus'] ?? "idle";
+    final String statusStr = data['callStatus'] ?? CallStatus.idle.name;
 
     final status = CallStatus.values.firstWhere(
       (e) => e.name == statusStr.toLowerCase(),
       orElse: () => CallStatus.idle,
     );
+
+    if (state.callStatus == CallStatus.idle && status == CallStatus.idle) {
+      return false;
+    }
 
     final int startTimeMs = data['callStartTime'] ?? 0;
 
@@ -35,19 +40,27 @@ class CallNotifier extends Notifier<CallState> {
 
     final newState = state.copyWith(
       callStatus: status,
+
       caller: isEnding
           ? state.caller
           : Caller(
               name: data['callerName'] ?? "Unknown",
               phone: data['callerPhone'] ?? "Unknown",
             ),
+
       connectedAt: startTimeMs > 0
           ? DateTime.fromMillisecondsSinceEpoch(startTimeMs)
           : null,
-      callScreenState: state.callScreenState.copyWith(
-        isMicrophoneButtonPressed: data['isMuted'] ?? false,
-        isSpeakerButtonPressed: data['isSpeakerOn'] ?? false,
-      ),
+      isFirstConnection: data['isFirstConnection'] ?? false,
+
+      callScreenState: status == CallStatus.idle
+          ? const CallScreenState()
+          : isEnding
+          ? state.callScreenState
+          : state.callScreenState.copyWith(
+              isMicrophoneButtonPressed: data['isMuted'] ?? false,
+              isSpeakerButtonPressed: data['isSpeakerOn'] ?? false,
+            ),
     );
 
     if (state == newState) {
