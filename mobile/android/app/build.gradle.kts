@@ -49,7 +49,6 @@ flutter {
 dependencies {
     implementation("com.twilio:voice-android:6.10.1")
     implementation("com.google.firebase:firebase-messaging:25.0.1")
-//    implementation("androidx.localbroadcastmanager:localbroadcastmanager:1.1.0")
     implementation("com.twilio:audioswitch:1.2.5")
     implementation("androidx.lifecycle:lifecycle-process:2.10.0")
 }

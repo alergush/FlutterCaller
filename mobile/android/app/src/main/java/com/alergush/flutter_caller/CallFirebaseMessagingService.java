@@ -1,6 +1,8 @@
 package com.alergush.flutter_caller;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -37,6 +39,33 @@ public class CallFirebaseMessagingService extends FirebaseMessagingService {
 
         if (data.isEmpty()) return;
 
+        String twiTo = data.get("twi_to");
+
+        if (twiTo == null) {
+            Log.e(TAG, "twi_to is null");
+            return;
+        }
+
+        String intendedOperatorId;
+
+        String[] twiToParts = twiTo.split(":");
+
+        if (twiToParts.length < 2) {
+            Log.e(TAG, "twi_to incorrect format: " + twiTo);
+            return;
+        }
+
+        intendedOperatorId = twiToParts[1];
+
+        SharedPreferences sharedPreferences = getSharedPreferences("prefs", Context.MODE_PRIVATE);
+
+        String loggedInOperatorId = sharedPreferences.getString("operatorId", null);
+
+        if (loggedInOperatorId == null || !loggedInOperatorId.equals(intendedOperatorId)) {
+            Log.w(TAG, "Call drop: No operator is logged on this device.");
+            return;
+        }
+
         Voice.handleMessage(this, data, messageListener);
     }
 
@@ -46,6 +75,8 @@ public class CallFirebaseMessagingService extends FirebaseMessagingService {
             Log.d(TAG, "onCallInvite() Incoming Call from: " + callInvite.getFrom());
 
             CallStateManager callStateManager = CallStateManager.getInstance();
+
+            Log.i(TAG, "callInvite.getTo() " + callInvite.getTo());
 
             if (callStateManager.getCallStatus() != CallStatus.IDLE &&
                     callStateManager.getCallStatus() != CallStatus.DISCONNECTED) {

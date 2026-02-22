@@ -5,6 +5,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -19,8 +20,10 @@ import com.alergush.flutter_caller.utils.CallEvents;
 import com.alergush.flutter_caller.utils.CallMethods;
 import com.alergush.flutter_caller.utils.CallServiceListener;
 import com.alergush.flutter_caller.utils.CallStateManager;
+import com.alergush.flutter_caller.utils.CallStatus;
 import com.twilio.voice.RegistrationException;
 import com.twilio.voice.RegistrationListener;
+import com.twilio.voice.UnregistrationListener;
 import com.twilio.voice.Voice;
 
 import io.flutter.embedding.android.FlutterActivity;
@@ -34,6 +37,8 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
     private static final String CHANNEL_METHODS = "com.alergush.flutter_caller/call_methods";
     private static final String CHANNEL_EVENTS = "com.alergush.flutter_caller/call_events";
 
+    SharedPreferences sharedPreferences;
+    SharedPreferences.Editor editor;
     private EventChannel.EventSink eventSink;
     private CallService callService;
     private boolean isBound = false;
@@ -44,6 +49,7 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
         public void onServiceConnected(ComponentName className, IBinder service) {
             CallService.LocalBinder binder = (CallService.LocalBinder) service;
             callService = binder.getService();
+
             isBound = true;
             callService.setListener(MainActivity.this);
 
@@ -68,6 +74,8 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         processIntent(getIntent());
+        sharedPreferences = getSharedPreferences("prefs", Context.MODE_PRIVATE);
+        editor = sharedPreferences.edit();
     }
 
     @Override
@@ -129,7 +137,19 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
             CallMethods method = CallMethods.valueOf(call.method);
             switch (method) {
                 case register -> {
-                    registerTwilio(call.argument("accessToken"), call.argument("fcmToken"));
+                    registerTwilio(
+                            call.argument("accessToken"),
+                            call.argument("fcmToken"),
+                            call.argument("operatorId"));
+
+                    result.success(null);
+                }
+
+                case unregister -> {
+                    unregisterTwilio(
+                            call.argument("accessToken"),
+                            call.argument("fcmToken"));
+
                     result.success(null);
                 }
 
@@ -177,6 +197,7 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
                         result.success(CallStateManager.getInstance().toMap());
 
                 case checkPermissions -> {
+                    Log.e(TAG, "Invoked method checkPermissions");
                     checkFullScreenIntentPermission();
                     result.success(null);
                 }
@@ -205,6 +226,21 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
     @Override
     public void onCallStateUpdated() {
         syncStateWithFlutter();
+
+        if (CallStateManager.getInstance().getCallStatus() == CallStatus.IDLE) {
+            if (isBound) {
+                try {
+                    unbindService(callServiceConnection);
+                }
+                catch (Exception e) {
+                    Log.e(TAG, "CallService Unbind Error" + e.getMessage());
+                }
+
+                isBound = false;
+            }
+
+            callService = null;
+        }
     }
 
     private void syncStateWithFlutter() {
@@ -219,18 +255,51 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
         return isBound && callService != null;
     }
 
-    private void registerTwilio(String accessToken, String fcmToken) {
-        Voice.register(accessToken, Voice.RegistrationChannel.FCM, fcmToken, new RegistrationListener() {
+    private void registerTwilio(String accessToken, String fcmToken, String operatorId) {
+        Voice.register(accessToken, Voice.RegistrationChannel.FCM, fcmToken,
+                new RegistrationListener() {
             @Override
             public void onRegistered(@NonNull String accessToken, @NonNull String fcmToken) {
+                Log.d(TAG, "Twilio Registration Success");
+
                 CallStateManager.getInstance().setRegistrationStatus(true, null);
+
+                editor.putString("operatorId", operatorId);
+                editor.apply();
+
+                Log.d(TAG, "OperatorId '" + operatorId +  "' saved to SharedPreferences");
+
                 syncStateWithFlutter();
             }
 
             @Override
-            public void onError(@NonNull RegistrationException e, @NonNull String accessToken, @NonNull String fcmToken) {
-                CallStateManager.getInstance().setRegistrationStatus(true, e.getMessage());
-                Log.e(TAG, "Registration Error: " + e.getMessage());
+            public void onError(@NonNull RegistrationException e, @NonNull String accessToken,
+                                @NonNull String fcmToken) {
+                Log.e(TAG, "Twilio Registration Error: " + e.getMessage());
+
+                CallStateManager.getInstance().setRegistrationStatus(false, e.getMessage());
+
+                editor.putString("operatorId", null);
+                editor.apply();
+
+                syncStateWithFlutter();
+            }
+        });
+    }
+
+    private void unregisterTwilio(String accessToken, String fcmToken) {
+        editor.putString("operatorId", null);
+        editor.apply();
+
+        Voice.unregister(accessToken, Voice.RegistrationChannel.FCM, fcmToken, new UnregistrationListener() {
+            @Override
+            public void onUnregistered(String accessToken, String fcmToken) {
+                Log.d(TAG, "Twilio Unregistration Success");
+            }
+
+            @Override
+            public void onError(RegistrationException registrationException, String accessToken, String fcmToken) {
+                Log.e(TAG, "Twilio Unregistration Error: " + registrationException.getMessage());
             }
         });
     }
@@ -238,6 +307,7 @@ public class MainActivity extends FlutterActivity implements CallServiceListener
     private void checkFullScreenIntentPermission() {
         if (Build.VERSION.SDK_INT >= 34) {
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+
             if (nm != null && !nm.canUseFullScreenIntent()) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT);
                 intent.setData(Uri.parse("package:" + getPackageName()));

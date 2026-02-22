@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_caller/app.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,9 +16,13 @@ void main() async {
 
   // timeDilation = 20;
 
-  runApp(
-    const ProviderScope(
-      child: App(),
-    ),
-  );
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]).then((_) {
+    runApp(
+      const ProviderScope(
+        child: App(),
+      ),
+    );
+  });
 }

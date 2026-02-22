@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Twilio.Jwt.AccessToken;
+using Twilio.TwiML;
+using Twilio.TwiML.Voice;
 
 namespace WebApi.Controllers
 {
@@ -17,7 +19,7 @@ namespace WebApi.Controllers
             var pushCredentialSid = configuration["Twilio:PushCredentialSid"];
             var tokenExpiration = int.Parse(configuration["Twilio:TokenExpiration"] ?? "3600");
 
-            const string identity = "user_1";
+            const string operatorId = "operator_1";
 
             var grant = new VoiceGrant
             {
@@ -30,14 +32,28 @@ namespace WebApi.Controllers
                 accountSid,
                 apiKey,
                 apiSecret,
-                identity: identity,
+                identity: operatorId,
                 expiration: DateTime.UtcNow.AddSeconds(tokenExpiration),
                 grants: [grant]
             );
 
-            Console.WriteLine($"Token generated for: {identity}");
+            Console.WriteLine($"Token generated for: {operatorId}");
 
-            return Ok(new { token = token.ToJwt(), identity });
+            return Ok(new { token = token.ToJwt(), operatorId });
+        }
+
+        [HttpPost("incoming")]
+        public IActionResult ReceiveIncomingCall()
+        {
+            var response = new VoiceResponse();
+            var dial = new Dial();
+
+            const string targetOperatorId = "operator_1";
+
+            dial.Client(targetOperatorId);
+            response.Append(dial);
+
+            return Content(response.ToString(), "application/xml");
         }
     }
 }

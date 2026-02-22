@@ -1,8 +1,15 @@
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_caller/models/tokens.dart';
+import 'package:flutter_caller/providers/auth_state_provider.dart';
+import 'package:flutter_caller/providers/operator_credentials_provider.dart';
+import 'package:flutter_caller/screens/auth_screen.dart';
+import 'package:flutter_caller/screens/sign_up_screen.dart';
+import 'package:flutter_caller/screens/splash_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_caller/models/call_status.dart';
@@ -11,7 +18,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'package:flutter_caller/models/call_methods.dart';
-import 'package:flutter_caller/screens/home_screen.dart';
 import 'package:flutter_caller/widgets/call_overlay_manager.dart';
 import 'package:flutter_caller/providers/call_state_provider.dart';
 
@@ -38,14 +44,12 @@ class App extends ConsumerStatefulWidget {
   ConsumerState<App> createState() => _AppState();
 }
 
-class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
-  String? _accessToken;
+class _AppState extends ConsumerState<App> {
   StreamSubscription? _eventSubscription;
 
   @override
   void initState() {
     super.initState();
-    _setup();
     _initEventListener();
   }
 
@@ -55,12 +59,21 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  void _initEventListener() {
+    _eventSubscription = eventChannel.receiveBroadcastStream().listen(
+      _onEventReceived,
+      onError: (dynamic error) {
+        debugPrint('Event Stream Error: $error');
+      },
+    );
+  }
+
   Future<void> _setup() async {
     bool permissionsGranted = await _checkPermissions();
     if (permissionsGranted) {
       await _register();
     } else {
-      await methodChannel.invokeMethod('checkPermissions');
+      await methodChannel.invokeMethod(CallMethods.checkPermissions);
       // debugPrint("Permissions denied. App functionality limited.");
     }
   }
@@ -86,21 +99,39 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   Future<void> _register() async {
     try {
       String? fcmToken = await FirebaseMessaging.instance.getToken();
-      debugPrint("FCM Token: $fcmToken");
+
+      debugPrint("FCM Token received");
 
       final url = Uri.parse('$serverBaseUrl/voice/token');
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         var data = jsonDecode(response.body);
-        _accessToken = data['token'];
+
+        String? accessToken = data['token'];
+
         debugPrint("Twilio Access Token received");
 
-        if (fcmToken != null && _accessToken != null) {
+        final String? operatorId = data['operatorId'];
+
+        debugPrint("operatorId: $operatorId");
+
+        if (fcmToken != null && accessToken != null && operatorId != null) {
           await methodChannel.invokeMethod(CallMethods.register, {
-            'accessToken': _accessToken,
+            'accessToken': accessToken,
             'fcmToken': fcmToken,
+            'operatorId': operatorId,
           });
+
+          ref
+              .read(operatorCredentialsProvider.notifier)
+              .set(
+                OperatorCredentials(
+                  twilioAccessToken: accessToken,
+                  fcmToken: fcmToken,
+                  operatorId: operatorId,
+                ),
+              );
         }
       } else {
         debugPrint('Server Error: ${response.statusCode}');
@@ -108,15 +139,6 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Registration Error: $e');
     }
-  }
-
-  void _initEventListener() {
-    _eventSubscription = eventChannel.receiveBroadcastStream().listen(
-      _onEventReceived,
-      onError: (dynamic error) {
-        debugPrint('Event Stream Error: $error');
-      },
-    );
   }
 
   void _onEventReceived(dynamic event) {
@@ -174,16 +196,49 @@ class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(authStateProvider, (previous, next) async {
+      if (next is AsyncData<User?>) {
+        final user = next.value;
+        final credentials = ref.read(operatorCredentialsProvider);
+
+        if (user != null) {
+          if (credentials == null) {
+            try {
+              await _setup();
+            } catch (e) {
+              debugPrint("Setup Error: $e");
+            }
+          }
+        } else {
+          if (credentials != null) {
+            try {
+              await methodChannel.invokeMethod(CallMethods.unregister, {
+                'accessToken': credentials.twilioAccessToken,
+                'fcmToken': credentials.fcmToken,
+              });
+
+              ref.read(operatorCredentialsProvider.notifier).clear();
+              ref.invalidate(callStateProvider);
+            } catch (e) {
+              debugPrint("Unregistration Error: $e");
+            }
+          }
+        }
+      }
+    });
+
     return MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Flutter Caller',
       routes: {
         'call_screen': (context) => const CallScreen(),
+        '/auth_screen': (context) => const AuthScreen(),
+        '/sign_up_screen': (context) => const SignUpScreen(),
       },
       home: const Scaffold(
-        backgroundColor: Color.fromARGB(255, 38, 38, 38),
-        body: CallOverlayManager(child: HomeScreen()),
+        // backgroundColor: Color.fromARGB(255, 38, 38, 38),
+        body: CallOverlayManager(child: SplashScreen()),
       ),
     );
   }
