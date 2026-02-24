@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_caller/providers/auth_provider.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
-  const SignUpScreen({super.key});
+  const SignUpScreen({
+    super.key,
+    required this.onTapLogIn,
+  });
+
+  final VoidCallback? onTapLogIn;
 
   @override
   ConsumerState<SignUpScreen> createState() => _CreateAccountScreenState();
@@ -11,57 +17,57 @@ class SignUpScreen extends ConsumerStatefulWidget {
 
 class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
   final _form = GlobalKey<FormState>();
+
   final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+
   bool _isHidenPass = true;
   bool _isHidenConfPass = true;
   bool _isLoading = false;
 
   static const int _minPassLength = 6;
+  static const int _minUsernameLength = 2;
 
-  Future<void> _submit(BuildContext context) async {
-    // scaffoldMessenger.currentState?.clearSnackBars();
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    ScaffoldMessenger.of(context).clearSnackBars();
 
     final isValid = _form.currentState!.validate();
 
     if (!isValid) return;
 
-    await _createUser(context);
+    await _signUp();
   }
 
-  Future<void> _createUser(BuildContext context) async {
-    // String email = _emailController.text.trim().toLowerCase();
-    // String password = _passwordController.text.trim();
-    // String username = _usernameController.text.trim();
+  Future<void> _signUp() async {
+    String email = _emailController.text.trim().toLowerCase();
+    String password = _passwordController.text.trim();
+    String username = _usernameController.text.trim();
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // await ref
-      //     .read(authControllerProvider.notifier)
-      //     .signUp(username, email, password);
-
-      // if (!context.mounted) return;
-
-      // Navigator.pushReplacement(
-      //   context,
-      //   MaterialPageRoute(builder: (ctx) => const HomeScreen()),
-      // );
+      await ref.read(authServiceProvider).signUp(email, password, username);
     } catch (error) {
       setState(() {
         _isLoading = false;
       });
 
-      // scaffoldMessenger.currentState?.showSnackBar(
-      //   SnackBar(
-      //     content: Text(error.toString()),
-      //     showCloseIcon: true,
-      //   ),
-      // );
+      if (!mounted) return;
+
+      _showSnackBar(error.toString());
     } finally {
       if (mounted) {
         setState(() {
@@ -71,8 +77,28 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
     }
   }
 
+  void _showSnackBar(String content) {
+    ScaffoldMessenger.of(
+      context,
+    ).clearSnackBars();
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
+      SnackBar(
+        content: Text(content),
+        showCloseIcon: true,
+        behavior: .floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    _isHidenPass = _isLoading ? true : _isHidenPass;
+    _isHidenConfPass = _isLoading ? true : _isHidenConfPass;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Flutter Caller'),
@@ -117,6 +143,7 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
                       children: [
                         TextFormField(
                           controller: _usernameController,
+                          enabled: !_isLoading,
                           decoration: InputDecoration(
                             label: const Text("Username"),
                             border: OutlineInputBorder(
@@ -124,6 +151,7 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
                             ),
                             suffixIcon: IconButton(
                               onPressed: () {
+                                HapticFeedback.lightImpact();
                                 _usernameController.text = "";
                               },
 
@@ -140,6 +168,7 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
                         const SizedBox(height: 32),
                         TextFormField(
                           controller: _emailController,
+                          enabled: !_isLoading,
                           decoration: InputDecoration(
                             label: const Text("Email"),
                             border: OutlineInputBorder(
@@ -147,6 +176,7 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
                             ),
                             suffixIcon: IconButton(
                               onPressed: () {
+                                HapticFeedback.lightImpact();
                                 _emailController.text = "";
                               },
                               icon: const Icon(Icons.highlight_off_rounded),
@@ -162,6 +192,7 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
                         const SizedBox(height: 32),
                         TextFormField(
                           controller: _passwordController,
+                          enabled: !_isLoading,
                           decoration: InputDecoration(
                             label: const Text("Password"),
                             border: OutlineInputBorder(
@@ -169,6 +200,7 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
                             ),
                             suffixIcon: IconButton(
                               onPressed: () {
+                                HapticFeedback.lightImpact();
                                 setState(() {
                                   _isHidenPass = !_isHidenPass;
                                 });
@@ -190,6 +222,7 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
                         const SizedBox(height: 32),
                         TextFormField(
                           controller: _confirmPasswordController,
+                          enabled: !_isLoading,
                           decoration: InputDecoration(
                             label: const Text("Confirm Password"),
                             border: OutlineInputBorder(
@@ -197,6 +230,7 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
                             ),
                             suffixIcon: IconButton(
                               onPressed: () {
+                                HapticFeedback.lightImpact();
                                 setState(() {
                                   _isHidenConfPass = !_isHidenConfPass;
                                 });
@@ -221,19 +255,28 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
                           child: FloatingActionButton(
                             elevation: 1,
                             heroTag: 'fab_sign_up',
-                            onPressed: _isLoading
-                                ? null
-                                : () async {
-                                    HapticFeedback.lightImpact();
-                                    await _submit(context);
-                                  },
+                            onPressed: () async {
+                              HapticFeedback.lightImpact();
+
+                              if (!_isLoading) {
+                                await _submit();
+                              }
+                            },
                             child: _isLoading
-                                ? SizedBox(
-                                    height: 30,
-                                    width: 30,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
+                                ? Row(
+                                    mainAxisAlignment: .center,
+                                    mainAxisSize: .min,
+                                    children: [
+                                      const Text("Signing up"),
+                                      const SizedBox(width: 16),
+                                      SizedBox(
+                                        height: 25,
+                                        width: 25,
+                                        child: const CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    ],
                                   )
                                 : const Text("Sign up"),
                           ),
@@ -246,12 +289,11 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
                             const SizedBox(width: 2),
                             TextButton(
                               onPressed: () {
-                                Navigator.of(
-                                  context,
-                                ).pushNamedAndRemoveUntil(
-                                  '/auth_screen',
-                                  (route) => false,
-                                );
+                                HapticFeedback.lightImpact();
+
+                                if (!_isLoading && widget.onTapLogIn != null) {
+                                  widget.onTapLogIn!();
+                                }
                               },
                               child: const Text(
                                 "Log in",
@@ -284,7 +326,7 @@ class _CreateAccountScreenState extends ConsumerState<SignUpScreen> {
       return 'Can only contain letters and spaces.';
     }
 
-    if (value.length < 2) {
+    if (value.length < _minUsernameLength) {
       return 'Username too short.';
     }
 

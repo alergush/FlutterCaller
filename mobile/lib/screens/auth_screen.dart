@@ -4,7 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_caller/providers/auth_provider.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
-  const AuthScreen({super.key});
+  const AuthScreen({
+    super.key,
+    required this.onTapSignUp,
+  });
+
+  final VoidCallback? onTapSignUp;
 
   @override
   ConsumerState<AuthScreen> createState() => _AuthScreenState();
@@ -12,20 +17,29 @@ class AuthScreen extends ConsumerStatefulWidget {
 
 class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _form = GlobalKey<FormState>();
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+
   bool _isPasswordHiden = true;
   bool _isLoadingSignIn = false;
   final _isLoadingSignInGoogle = false;
 
   @override
-  void initState() {
-    super.initState();
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
-    // GoogleSignIn.instance.initialize(
-    //   serverClientId:
-    //       "603682868214-sh32roipbm9sjc6o33l6ga101v04ngaj.apps.googleusercontent.com",
-    // );
+  Future<void> _submit() async {
+    ScaffoldMessenger.of(context).clearSnackBars();
+
+    final isValid = _form.currentState!.validate();
+
+    if (!isValid) return;
+
+    await _signIn();
   }
 
   Future<void> _signIn() async {
@@ -41,12 +55,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final password = _passwordController.text.trim();
 
     try {
-      await ref
-          .read(authProvider)
-          .signInWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
+      await ref.read(authServiceProvider).signIn(email, password);
     } catch (error) {
       setState(() {
         _isLoadingSignIn = false;
@@ -54,20 +63,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).clearSnackBars();
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        SnackBar(
-          content: Text(error.toString()),
-          showCloseIcon: true,
-          behavior: .floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      _showSnackBar(error.toString());
     } finally {
       if (mounted) {
         setState(() {
@@ -77,47 +73,22 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
-  // Future<void> _signInWithGoogle() async {
-  //   setState(() {
-  //     _isLoadingSignInGoogle = true;
-  //   });
+  void _showSnackBar(String content) {
+    ScaffoldMessenger.of(
+      context,
+    ).clearSnackBars();
 
-  //   try {
-  // final res = await ref
-  //     .read(authControllerProvider.notifier)
-  //     .signInWithGoogle();
-
-  // if (!res) {
-  //   setState(() {
-  //     _isLoadingSignInGoogle = false;
-  //   });
-  //   return;
-  // }
-
-  // if (!mounted) return;
-
-  // Navigator.of(context).pushReplacement(
-  //   MaterialPageRoute(builder: (ctx) => const HomeScreen()),
-  // );
-  // } catch (error) {
-  //   setState(() {
-  //     _isLoadingSignInGoogle = false;
-  //   });
-  //
-  // scaffoldMessenger.currentState?.showSnackBar(
-  //   SnackBar(
-  //     content: Text(error.toString()),
-  //     showCloseIcon: true,
-  //   ),
-  // );
-  //   } finally {
-  //     if (mounted) {
-  //       setState(() {
-  //         _isLoadingSignInGoogle = false;
-  //       });
-  //     }
-  //   }
-  // }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
+      SnackBar(
+        content: Text(content),
+        showCloseIcon: true,
+        behavior: .floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,17 +116,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Center(
-                  //   child: Image.asset(
-                  //     'assets/images/logo.png',
-                  //     width: 100,
-                  //     height: 100,
-                  //     fit: BoxFit.cover,
-                  //   ),
-                  // ),
-                  const SizedBox(height: 30),
-
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 50),
                   Center(
                     child: Text(
                       "Welcome",
@@ -246,7 +207,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
                               if (!_isLoadingSignIn &&
                                   !_isLoadingSignInGoogle) {
-                                await _signIn();
+                                await _submit();
                               }
                             },
                             child: _isLoadingSignIn
@@ -279,13 +240,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                                 HapticFeedback.lightImpact();
 
                                 if (!_isLoadingSignIn &&
-                                    !_isLoadingSignInGoogle) {
-                                  Navigator.of(
-                                    context,
-                                  ).pushNamedAndRemoveUntil(
-                                    '/sign_up_screen',
-                                    (route) => false,
-                                  );
+                                    !_isLoadingSignInGoogle &&
+                                    widget.onTapSignUp != null) {
+                                  widget.onTapSignUp!();
                                 }
                               },
                               child: const Text(
@@ -294,71 +251,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                             ),
                           ],
                         ),
-                        // const SizedBox(height: 24),
-                        // Row(
-                        //   children: [
-                        //     Expanded(
-                        //       child: Divider(
-                        //         color: Colors.grey,
-                        //       ),
-                        //     ),
-                        //     const SizedBox(width: 12),
-                        //     const Text("OR"),
-                        //     const SizedBox(width: 12),
-                        //     Expanded(
-                        //       child: Divider(
-                        //         color: Colors.grey,
-                        //       ),
-                        //     ),
-                        //   ],
-                        // ),
-                        // const SizedBox(height: 36),
-                        // SizedBox(
-                        //   width: double.infinity,
-                        //   child: FloatingActionButton(
-                        //     shape: RoundedRectangleBorder(
-                        //       borderRadius: BorderRadiusGeometry.circular(16),
-                        //     ),
-                        //     elevation: 1,
-                        //     heroTag: 'fab_sign_in_google',
-                        //     onPressed:
-                        //         !_isLoadingSignIn && !_isLoadingSignInGoogle
-                        //         ? () async {
-                        //             HapticFeedback.lightImpact();
-                        //             await _signInWithGoogle();
-                        //           }
-                        //         : null,
-                        //     child: Stack(
-                        //       alignment: AlignmentGeometry.center,
-                        //       children: [
-                        //         Padding(
-                        //           padding: const EdgeInsets.only(left: 24),
-                        //           child: Align(
-                        //             alignment: AlignmentGeometry.centerLeft,
-                        //             // child: Image.asset(
-                        //             //   'assets/images/google.png',
-                        //             //   height: 30,
-                        //             //   width: 30,
-                        //             // ),
-                        //             child: const SizedBox(
-                        //               height: 30,
-                        //               width: 30,
-                        //             ),
-                        //           ),
-                        //         ),
-                        //         _isLoadingSignInGoogle
-                        //             ? SizedBox(
-                        //                 height: 30,
-                        //                 width: 30,
-                        //                 child: const CircularProgressIndicator(
-                        //                   strokeWidth: 2,
-                        //                 ),
-                        //               )
-                        //             : const Text("Sign in with Google"),
-                        //       ],
-                        //     ),
-                        //   ),
-                        // ),
                       ],
                     ),
                   ),

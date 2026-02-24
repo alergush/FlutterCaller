@@ -1,5 +1,5 @@
 import 'package:flutter_caller/models/tokens.dart';
-import 'package:flutter_caller/providers/auth_state_provider.dart';
+import 'package:flutter_caller/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class OperatorCredentialsNotifier extends Notifier<OperatorCredentials?> {

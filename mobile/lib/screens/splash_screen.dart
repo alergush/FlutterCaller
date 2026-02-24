@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_caller/utils/auth_wrapper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_caller/screens/auth_screen.dart';
 import 'package:flutter_caller/screens/home_screen.dart';
-import 'package:flutter_caller/providers/auth_state_provider.dart';
+import 'package:flutter_caller/providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerWidget {
   const SplashScreen({super.key});
@@ -18,8 +18,8 @@ class SplashScreen extends ConsumerWidget {
       },
       child: authStateAsync.when(
         data: (user) => user != null
-            ? const HomeScreen(key: ValueKey('HomeScreen'))
-            : const AuthScreen(key: ValueKey('AuthScreen')),
+            ? const ClientsScreen(key: ValueKey('HomeScreen'))
+            : const AuthWrapper(key: ValueKey('AuthWrapper')),
         error: (error, stack) =>
             const Scaffold(body: Center(child: Text("ERROR"))),
         loading: () => const Scaffold(

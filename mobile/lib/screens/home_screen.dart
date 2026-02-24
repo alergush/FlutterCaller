@@ -3,14 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_caller/providers/auth_provider.dart';
 
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+class ClientsScreen extends ConsumerWidget {
+  const ClientsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Home"),
+        title: const Text("Clients"),
         centerTitle: true,
       ),
       body: SizedBox(
@@ -22,27 +22,29 @@ class HomeScreen extends ConsumerWidget {
           mainAxisSize: .max,
           children: [
             Spacer(),
-            ElevatedButton(
-              onPressed: () async {
-                HapticFeedback.lightImpact();
-              },
-              style: ElevatedButton.styleFrom(
-                shape: const CircleBorder(),
-                padding: const EdgeInsets.all(12),
-                backgroundColor: Colors.green,
-                iconSize: 32,
-                iconColor: Colors.white,
-                elevation: 3,
-              ),
+            // ElevatedButton(
+            //   onPressed: () async {
+            //     HapticFeedback.lightImpact();
+            //   },
+            //   style: ElevatedButton.styleFrom(
+            //     shape: const CircleBorder(),
+            //     padding: const EdgeInsets.all(12),
+            //     backgroundColor: Colors.green,
+            //     iconSize: 32,
+            //     iconColor: Colors.white,
+            //     elevation: 3,
+            //   ),
 
-              child: const Icon(Icons.phone),
-            ),
+            //   child: const Icon(Icons.phone),
+            // ),
+            Spacer(),
+            Spacer(),
             Spacer(),
             TextButton.icon(
               onPressed: () async {
                 HapticFeedback.lightImpact();
 
-                await ref.read(authProvider).signOut();
+                await ref.read(firebaseAuthProvider).signOut();
               },
               icon: const Icon(
                 Icons.logout,

@@ -5,10 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_caller/models/tokens.dart';
-import 'package:flutter_caller/providers/auth_state_provider.dart';
+import 'package:flutter_caller/providers/auth_provider.dart';
 import 'package:flutter_caller/providers/operator_credentials_provider.dart';
-import 'package:flutter_caller/screens/auth_screen.dart';
-import 'package:flutter_caller/screens/sign_up_screen.dart';
 import 'package:flutter_caller/screens/splash_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -232,9 +230,7 @@ class _AppState extends ConsumerState<App> {
       debugShowCheckedModeBanner: false,
       title: 'Flutter Caller',
       routes: {
-        'call_screen': (context) => const CallScreen(),
-        '/auth_screen': (context) => const AuthScreen(),
-        '/sign_up_screen': (context) => const SignUpScreen(),
+        'call_screen': (_) => const CallScreen(),
       },
       home: const Scaffold(
         // backgroundColor: Color.fromARGB(255, 38, 38, 38),
