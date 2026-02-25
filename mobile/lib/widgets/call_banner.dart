@@ -6,8 +6,8 @@ import 'package:flutter_caller/screens/call_screen.dart';
 import 'package:flutter_caller/providers/call_state_provider.dart';
 import 'package:flutter_caller/widgets/call_screen/call_timer_widget.dart';
 
-class CallBannerWidget extends ConsumerWidget {
-  const CallBannerWidget({
+class CallBanner extends ConsumerWidget {
+  const CallBanner({
     super.key,
   });
 

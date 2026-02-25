@@ -13,6 +13,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool showSignIn = true;
 
   void toggleView() {
+    ScaffoldMessenger.maybeOf(context)?.clearSnackBars();
+
     setState(() {
       showSignIn = !showSignIn;
     });

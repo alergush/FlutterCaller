@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_caller/models/call_status.dart';
-import 'package:flutter_caller/widgets/call_banner_widget.dart';
+import 'package:flutter_caller/widgets/call_banner.dart';
 import 'package:flutter_caller/providers/call_state_provider.dart';
 
 class CallOverlayManager extends ConsumerWidget {
@@ -22,7 +22,7 @@ class CallOverlayManager extends ConsumerWidget {
 
     return Column(
       children: [
-        const CallBannerWidget(),
+        const CallBanner(),
         // Other Screen
         Expanded(
           child: isBannerVisible

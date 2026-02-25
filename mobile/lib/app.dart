@@ -1,12 +1,10 @@
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_caller/models/tokens.dart';
-import 'package:flutter_caller/providers/auth_provider.dart';
-import 'package:flutter_caller/providers/operator_credentials_provider.dart';
+import 'package:flutter_caller/models/operator_credentials.dart';
+import 'package:flutter_caller/screens/create_client_screen.dart';
 import 'package:flutter_caller/screens/splash_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +16,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_caller/models/call_methods.dart';
 import 'package:flutter_caller/widgets/call_overlay_manager.dart';
 import 'package:flutter_caller/providers/call_state_provider.dart';
+import 'package:flutter_caller/providers/operator_credentials_provider.dart';
 
 const serverBaseUrl = "http://192.168.0.150:3000/api";
 
@@ -66,6 +65,7 @@ class _AppState extends ConsumerState<App> {
     );
   }
 
+  // ignore: unused_element
   Future<void> _setup() async {
     bool permissionsGranted = await _checkPermissions();
     if (permissionsGranted) {
@@ -194,36 +194,36 @@ class _AppState extends ConsumerState<App> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(authStateProvider, (previous, next) async {
-      if (next is AsyncData<User?>) {
-        final user = next.value;
-        final credentials = ref.read(operatorCredentialsProvider);
+    // ref.listen(authStateProvider, (previous, next) async {
+    //   if (next is AsyncData<User?>) {
+    //     final user = next.value;
+    //     final credentials = ref.read(operatorCredentialsProvider);
 
-        if (user != null) {
-          if (credentials == null) {
-            try {
-              await _setup();
-            } catch (e) {
-              debugPrint("Setup Error: $e");
-            }
-          }
-        } else {
-          if (credentials != null) {
-            try {
-              await methodChannel.invokeMethod(CallMethods.unregister, {
-                'accessToken': credentials.twilioAccessToken,
-                'fcmToken': credentials.fcmToken,
-              });
+    //     if (user != null) {
+    //       if (credentials == null) {
+    //         try {
+    //           await _setup();
+    //         } catch (e) {
+    //           debugPrint("Setup Error: $e");
+    //         }
+    //       }
+    //     } else {
+    //       if (credentials != null) {
+    //         try {
+    //           await methodChannel.invokeMethod(CallMethods.unregister, {
+    //             'accessToken': credentials.twilioAccessToken,
+    //             'fcmToken': credentials.fcmToken,
+    //           });
 
-              ref.read(operatorCredentialsProvider.notifier).clear();
-              ref.invalidate(callStateProvider);
-            } catch (e) {
-              debugPrint("Unregistration Error: $e");
-            }
-          }
-        }
-      }
-    });
+    //           ref.read(operatorCredentialsProvider.notifier).clear();
+    //           ref.invalidate(callStateProvider);
+    //         } catch (e) {
+    //           debugPrint("Unregistration Error: $e");
+    //         }
+    //       }
+    //     }
+    //   }
+    // });
 
     return MaterialApp(
       navigatorKey: navigatorKey,
@@ -231,6 +231,7 @@ class _AppState extends ConsumerState<App> {
       title: 'Flutter Caller',
       routes: {
         'call_screen': (_) => const CallScreen(),
+        'add_client_screen': (_) => const AddClientScreen(),
       },
       home: const Scaffold(
         // backgroundColor: Color.fromARGB(255, 38, 38, 38),
